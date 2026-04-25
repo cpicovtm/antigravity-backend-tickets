@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =======================
+// MODELOS DE SEGURIDAD / ACCESO
+// =======================
+
+model Profile {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users          User[]
+  profileOptions ProfileOption[]
+
+  @@map("profiles")
+}
+
+model Module {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  active      Boolean @default(true)
+
+  options Option[]
+
+  @@map("modules")
+}
+
+model Option {
+  id       String  @id @default(uuid()) @db.Uuid
+  moduleId String  @map("module_id") @db.Uuid
+  name     String
+  path     String?
+  icon     String?
+
+  module         Module          @relation(fields: [moduleId], references: [id])
+  profileOptions ProfileOption[]
+
+  @@map("options")
+}
+
+model ProfileOption {
+  id        String @id @default(uuid()) @db.Uuid
+  profileId String @map("profile_id") @db.Uuid
+  optionId  String @map("option_id") @db.Uuid
+
+  profile Profile @relation(fields: [profileId], references: [id])
+  option  Option  @relation(fields: [optionId], references: [id])
+
+  @@map("profile_options")
+}
+
+// =======================
+// MODELOS DE USUARIOS
+// =======================
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  email     String   @unique
+  password  String
+  profileId String   @map("profile_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  profile Profile @relation(fields: [profileId], references: [id])
+
+  ticketsCreated  Ticket[]     @relation("TicketCreator")
+  ticketsAssigned Ticket[]     @relation("TicketAssignee")
+  comments        Comment[]
+  assignments     Assignment[]
+
+  @@map("users")
+}
+
+// =======================
+// MODELOS DE TICKETS (CORE)
+// =======================
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Ticket {
+  id          String         @id @default(uuid()) @db.Uuid
+  title       String
+  description String         @db.Text
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  userId      String         @map("user_id") @db.Uuid
+  assignedTo  String?        @map("assigned_to") @db.Uuid
+
+  creator  User  @relation("TicketCreator", fields: [userId], references: [id])
+  assignee User? @relation("TicketAssignee", fields: [assignedTo], references: [id])
+
+  comments    Comment[]
+  assignments Assignment[]
+
+  @@map("tickets")
+}
+
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  userId    String   @map("user_id") @db.Uuid
+  ticketId  String   @map("ticket_id") @db.Uuid
+
+  user   User   @relation(fields: [userId], references: [id])
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+
+  @@map("comments")
+}
+
+model Assignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  ticketId   String   @map("ticket_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user   User   @relation(fields: [userId], references: [id])
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+
+  @@map("assignments")
+}
